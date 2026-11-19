@@ -86,6 +86,16 @@ class WorkRepository(context: Context) {
         return prefs.getStringSet("done_${date}", emptySet()) ?: emptySet()
     }
 
+    fun setCompletedIds(ids: Set<String>, date: LocalDate = LocalDate.now()) {
+        prefs.edit().putStringSet("done_${date}", ids).apply()
+    }
+
+    fun getSyncRoomCode(): String = prefs.getString("sync_room_code", "") ?: ""
+
+    fun setSyncRoomCode(code: String) {
+        prefs.edit().putString("sync_room_code", code.trim()).apply()
+    }
+
     fun toggleTaskDone(taskId: String, date: LocalDate = LocalDate.now()) {
         val key = "done_${date}"
         val set = getCompletedIds(date).toMutableSet()

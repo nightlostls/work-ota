@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.work.app.data.*
 import com.work.app.update.OtaUpdater
+import com.work.app.sync.FirebaseSync
 import com.work.app.notification.PinnedTaskNotification
 import com.work.app.wallpaper.LockScreenRenderer
 import com.work.app.worker.DailyResetWorker
@@ -73,11 +74,26 @@ fun WorkAppScreen() {
         }
     }
 
-    fun refreshAll() {
+    fun refreshLocalOnly() {
         tasks = repo.getTasksForDate()
         doneIds = repo.getCompletedIds()
         PinnedTaskNotification.showOrUpdate(ctx)
         LockScreenRenderer.renderAndApplyLockScreen(ctx)
+    }
+
+    fun refreshAll() {
+        refreshLocalOnly()
+        if (repo.getSyncRoomCode().isNotBlank()) {
+            FirebaseSync.pushToCloud(ctx)
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        if (repo.getSyncRoomCode().isNotBlank()) {
+            FirebaseSync.pullFromCloud(ctx) { ok, _ ->
+                if (ok) refreshLocalOnly()
+            }
+        }
     }
 
     Scaffold(
@@ -158,7 +174,42 @@ fun WorkAppScreen() {
                     ) { Text("+ Tải ảnh của bạn vào kho hình nền") }
                 }
                 else -> {
+                    var roomCode by remember { mutableStateOf(repo.getSyncRoomCode()) }
+                    var syncStatus by remember { mutableStateOf(if (roomCode.isBlank()) "Nhập mã phòng giống nhau trên 2 máy để đồng bộ" else "Đang kết nối phòng: $roomCode") }
                     var otaStatus by remember { mutableStateOf("Phiên bản hiện tại: v${OtaUpdater.getCurrentVersion(ctx)}") }
+
+                    Text("Đồng bộ 2 điện thoại (Firebase)", color = Color.White, fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.height(6.dp))
+                    OutlinedTextField(
+                        value = roomCode,
+                        onValueChange = { roomCode = it },
+                        label = { Text("Mã phòng đồng bộ (vd: minhduc-2026)") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    Text(syncStatus, fontSize = 12.sp, color = Color(0xFF94A3B8))
+                    Spacer(Modifier.height(8.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                        Button(
+                            onClick = {
+                                repo.setSyncRoomCode(roomCode)
+                                FirebaseSync.pullFromCloud(ctx) { ok, msg ->
+                                    syncStatus = msg
+                                    if (ok) refreshLocalOnly()
+                                }
+                            },
+                            modifier = Modifier.weight(1f)
+                        ) { Text("⬇ Kéo về") }
+                        OutlinedButton(
+                            onClick = {
+                                repo.setSyncRoomCode(roomCode)
+                                FirebaseSync.pushToCloud(ctx) { msg -> syncStatus = msg }
+                            },
+                            modifier = Modifier.weight(1f)
+                        ) { Text("⬆ Đẩy lên") }
+                    }
+                    Spacer(Modifier.height(16.dp))
                     Button(
                         onClick = { imagePicker.launch("image/*") },
                         modifier = Modifier.fillMaxWidth()
