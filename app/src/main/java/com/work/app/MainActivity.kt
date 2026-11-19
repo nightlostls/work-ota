@@ -464,53 +464,97 @@ fun SettingsTabView(
     onSyncPulled: () -> Unit
 ) {
     val ctx = LocalContext.current
+    var syncCal by remember { mutableStateOf(repo.isSyncCalendarEnabled()) }
+    var notifOn by remember { mutableStateOf(repo.isNotificationsEnabled()) }
+    var beforeMin by remember { mutableStateOf(repo.getDefaultBeforeMin()) }
     var roomCode by remember { mutableStateOf(repo.getSyncRoomCode()) }
-    var syncStatus by remember { mutableStateOf(if (roomCode.isBlank()) "Nhập mã phòng giống nhau trên 2 máy để đồng bộ" else "Đang kết nối phòng: $roomCode") }
+    var syncStatus by remember { mutableStateOf(if (roomCode.isBlank()) "Nhập mã phòng giống nhau trên 2 máy" else "Phòng: $roomCode") }
     var otaStatus by remember { mutableStateOf("Phiên bản hiện tại: v${OtaUpdater.getCurrentVersion(ctx)}") }
 
-    Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("Cài đặt", fontSize = 22.sp, fontWeight = FontWeight.ExtraBold, color = Color.White)
 
-        Text("Đồng bộ 2 điện thoại (Firebase)", color = Color.White, fontWeight = FontWeight.Bold)
-        OutlinedTextField(
-            value = roomCode,
-            onValueChange = { roomCode = it },
-            label = { Text("Mã phòng đồng bộ (vd: minhduc-2026)") },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth()
-        )
-        Text(syncStatus, fontSize = 12.sp, color = Color(0xFF94A3B8))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-            Button(
-                onClick = {
+        // LỊCH & ĐỒNG BỘ
+        Text("LỊCH & ĐỒNG BỘ", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color(0xFF94A3B8))
+        Column(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(Color(0xFF1A1F29)).padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("Liên kết Lịch Google / Lịch máy", color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                    Text("Hiện sinh nhật & ngày quan trọng lên Lịch và màn hình khóa", color = Color(0xFF94A3B8), fontSize = 11.sp)
+                }
+                Switch(checked = syncCal, onCheckedChange = {
+                    syncCal = it
+                    repo.setSyncCalendarEnabled(it)
+                    LockScreenRenderer.renderAndApplyLockScreen(ctx)
+                })
+            }
+        }
+
+        // THÔNG BÁO & LỜI NHẮC
+        Text("THÔNG BÁO & LỜI NHẮC", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color(0xFF94A3B8))
+        Column(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(Color(0xFF1A1F29)).padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("Nhắc việc và ghi chú", color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                    Text("Tự đọc giờ trong ghi chú (vd: 'nhắc trước 30 phút')", color = Color(0xFF94A3B8), fontSize = 11.sp)
+                }
+                Switch(checked = notifOn, onCheckedChange = {
+                    notifOn = it
+                    repo.setNotificationsEnabled(it)
+                    if (it) onShowNotif()
+                })
+            }
+            Text("Nhắc mặc định cho việc có giờ:", color = Color(0xFFCBD5E1), fontSize = 12.sp)
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                listOf(0 to "Đúng giờ", 15 to "Trước 15p", 30 to "Trước 30p").forEach { (m, lbl) ->
+                    FilterChip(selected = beforeMin == m, onClick = {
+                        beforeMin = m
+                        repo.setDefaultBeforeMin(m)
+                    }, label = { Text(lbl, fontSize = 11.sp) })
+                }
+            }
+            OutlinedButton(onClick = onShowNotif, modifier = Modifier.fillMaxWidth()) {
+                Text("🔔 Cập nhật thông báo ghim trên thanh trạng thái", fontSize = 12.sp)
+            }
+        }
+
+        // HÌNH NỀN & ĐỒNG BỘ 2 MÁY
+        Text("HÌNH NỀN & ĐỒNG BỘ 2 MÁY", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color(0xFF94A3B8))
+        Column(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(Color(0xFF1A1F29)).padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Button(onClick = onPickNewImage, modifier = Modifier.fillMaxWidth()) {
+                Text("📁 Tải ảnh nền của bạn lên")
+            }
+            OutlinedTextField(
+                value = roomCode,
+                onValueChange = { roomCode = it },
+                label = { Text("Mã phòng đồng bộ Firebase (vd: minhduc-2026)") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
+            )
+            Text(syncStatus, fontSize = 11.sp, color = Color(0xFF94A3B8))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                Button(onClick = {
                     repo.setSyncRoomCode(roomCode)
                     FirebaseSync.pullFromCloud(ctx) { ok, msg ->
                         syncStatus = msg
                         if (ok) onSyncPulled()
                     }
-                },
-                modifier = Modifier.weight(1f)
-            ) { Text("⬇ Kéo về") }
-            OutlinedButton(
-                onClick = {
+                }, modifier = Modifier.weight(1f)) { Text("⬇ Kéo về") }
+                OutlinedButton(onClick = {
                     repo.setSyncRoomCode(roomCode)
                     FirebaseSync.pushToCloud(ctx) { msg -> syncStatus = msg }
-                },
-                modifier = Modifier.weight(1f)
-            ) { Text("⬆ Đẩy lên") }
+                }, modifier = Modifier.weight(1f)) { Text("⬆ Đẩy lên") }
+            }
         }
 
-        Spacer(Modifier.height(6.dp))
-        Button(onClick = onPickNewImage, modifier = Modifier.fillMaxWidth()) { Text("Tải ảnh nền màn hình khóa") }
-        OutlinedButton(onClick = onShowNotif, modifier = Modifier.fillMaxWidth()) { Text("Bật thông báo ghim trên thanh trạng thái") }
-
-        Spacer(Modifier.height(6.dp))
-        Text("Cập nhật ứng dụng (GitHub OTA)", color = Color.White, fontWeight = FontWeight.Bold)
-        Text(otaStatus, fontSize = 12.sp, color = Color(0xFF94A3B8))
-        Button(
-            onClick = { OtaUpdater.checkAndInstallUpdate(ctx) { msg -> otaStatus = msg } },
-            modifier = Modifier.fillMaxWidth()
-        ) { Text("🔄 Kiểm tra & Cập nhật ngay") }
+        // CẬP NHẬT OTA
+        Text("CẬP NHẬT ỨNG DỤNG (GITHUB OTA)", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color(0xFF94A3B8))
+        Column(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(Color(0xFF1A1F29)).padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(otaStatus, fontSize = 12.sp, color = Color(0xFF94A3B8))
+            Button(onClick = { OtaUpdater.checkAndInstallUpdate(ctx) { msg -> otaStatus = msg } }, modifier = Modifier.fillMaxWidth()) {
+                Text("🔄 Kiểm tra & Cập nhật ngay")
+            }
+        }
     }
 }
 

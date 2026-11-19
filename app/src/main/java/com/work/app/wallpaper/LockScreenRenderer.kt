@@ -4,6 +4,7 @@ import android.app.WallpaperManager
 import android.content.Context
 import android.graphics.*
 import com.work.app.calendar.DeviceCalendarSync
+import com.work.app.data.RepeatType
 import com.work.app.data.WorkRepository
 import java.io.File
 import java.time.LocalDate
@@ -16,7 +17,7 @@ object LockScreenRenderer {
         val today = LocalDate.now()
         val tasks = repo.getTasksForDate(today)
         val doneIds = repo.getCompletedIds(today)
-        val events = DeviceCalendarSync.getEventsForDate(context, today)
+        val events = if (repo.isSyncCalendarEnabled()) DeviceCalendarSync.getEventsForDate(context, today) else emptyList()
 
         val width = 1080
         val height = 2400
@@ -42,44 +43,131 @@ object LockScreenRenderer {
             canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), bgPaint)
         }
 
-        // 2. Translucent card below clock area
-        val cardTop = 760f
-        val itemCount = (tasks.size + events.size).coerceAtLeast(1).coerceAtMost(8)
-        val cardHeight = 160f + itemCount * 84f
-        val cardRect = RectF(64f, cardTop, width - 64f, cardTop + cardHeight)
-        val cardPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(185, 15, 20, 28) }
-        canvas.drawRoundRect(cardRect, 42f, 42f, cardPaint)
+        val cardPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(188, 15, 20, 28) }
 
-        // 3. Card Header
-        val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.WHITE
-            textSize = 42f
+        // 2. Top Weekly Calendar Strip Card (T2..CN)
+        val weekTop = 730f
+        val weekHeight = 250f
+        canvas.drawRoundRect(RectF(56f, weekTop, width - 56f, weekTop + weekHeight), 40f, 40f, cardPaint)
+
+        val monday = today.minusDays((today.dayOfWeek.value - 1).toLong())
+        val dayLabels = listOf("T2", "T3", "T4", "T5", "T6", "T7", "CN")
+        val colW = (width - 140f) / 7f
+
+        val dayLabelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.argb(200, 203, 213, 225)
+            textSize = 28f
+            textAlign = Paint.Align.CENTER
+        }
+        val dayNumPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            textSize = 34f
+            textAlign = Paint.Align.CENTER
             typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
         }
-        val dateLabel = today.format(DateTimeFormatter.ofPattern("EEEE, dd/MM", Locale("vi", "VN")))
-        canvas.drawText(dateLabel, 110f, cardTop + 76f, titlePaint)
+        val pillPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+        val pillTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            textSize = 20f
+            textAlign = Paint.Align.CENTER
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        }
 
-        var y = cardTop + 160f
-        val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { textSize = 36f }
-        val dotPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+        for (i in 0..6) {
+            val d = monday.plusDays(i.toLong())
+            val cx = 70f + colW * i + colW / 2f
+            canvas.drawText(dayLabels[i], cx, weekTop + 54f, dayLabelPaint)
+
+            if (d == today) {
+                pillPaint.color = Color.WHITE
+                canvas.drawCircle(cx, weekTop + 106f, 30f, pillPaint)
+                dayNumPaint.color = 0xFF0F172A.toInt()
+            } else {
+                dayNumPaint.color = Color.WHITE
+            }
+            canvas.drawText("${d.dayOfMonth}", cx, weekTop + 118f, dayNumPaint)
+
+            val dayTasks = repo.getTasksForDate(d)
+            if (dayTasks.isNotEmpty()) {
+                val pillRect = RectF(cx - colW * 0.4f, weekTop + 158f, cx + colW * 0.4f, weekTop + 196f)
+                pillPaint.color = 0x5538BDF8.toInt()
+                canvas.drawRoundRect(pillRect, 10f, 10f, pillPaint)
+                pillTextPaint.color = 0xFFE0F2FE.toInt()
+                canvas.drawText("${dayTasks.size} việc", cx, weekTop + 184f, pillTextPaint)
+            }
+        }
+
+        // 3. Today's Tasks Card (like Simulator)
+        val cardTop = weekTop + weekHeight + 28f
+        val totalItems = tasks.size + events.size
+        val visibleRows = (events.take(2).size + tasks.take(6).size).coerceAtLeast(1)
+        val cardHeight = 160f + visibleRows * 84f
+        canvas.drawRoundRect(RectF(56f, cardTop, width - 56f, cardTop + cardHeight), 40f, 40f, cardPaint)
+
+        val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.WHITE
+            textSize = 40f
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        }
+        val dateLabel = today.format(DateTimeFormatter.ofPattern("EEEE, 'ngày' dd 'tháng' MM", Locale("vi", "VN")))
+            .replaceFirstChar { it.uppercase() }
+        canvas.drawText(dateLabel, 96f, cardTop + 74f, titlePaint)
+
+        // White count badge circle on top right
+        pillPaint.color = Color.WHITE
+        canvas.drawCircle(width - 116f, cardTop + 60f, 30f, pillPaint)
+        dayNumPaint.color = 0xFF0F172A.toInt()
+        dayNumPaint.textSize = 30f
+        canvas.drawText("$totalItems", width - 116f, cardTop + 71f, dayNumPaint)
+
+        var y = cardTop + 156f
+        val timePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.argb(220, 203, 213, 225)
+            textSize = 30f
+        }
+        val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { textSize = 34f }
+        val circleFillPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+        val circleStrokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE
+            strokeWidth = 5f
+        }
+        val symbolPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = 0xFF0F172A.toInt()
+            textSize = 24f
+            textAlign = Paint.Align.CENTER
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        }
 
         events.take(2).forEach { ev ->
-            dotPaint.color = 0xFFFBBF24.toInt()
-            canvas.drawCircle(130f, y - 12f, 14f, dotPaint)
+            canvas.drawText("Lịch", 96f, y, timePaint)
+            circleFillPaint.color = 0xFFFBBF24.toInt()
+            canvas.drawCircle(240f, y - 11f, 20f, circleFillPaint)
+            canvas.drawText("★", 240f, y - 3f, symbolPaint)
             textPaint.color = 0xFFFDE68A.toInt()
-            canvas.drawText("📅 ${ev.title.take(30)}", 170f, y, textPaint)
+            textPaint.isStrikeThruText = false
+            canvas.drawText(ev.title.take(26), 282f, y, textPaint)
             y += 84f
         }
 
         tasks.take(6).forEach { task ->
             val isDone = doneIds.contains(task.id)
-            dotPaint.color = if (isDone) 0xFF34D399.toInt() else task.quadrant.colorHex.toInt()
-            canvas.drawCircle(130f, y - 12f, 16f, dotPaint)
+            val timePrefix = task.time ?: "Cả ngày"
+            canvas.drawText(timePrefix, 96f, y, timePaint)
 
-            textPaint.color = if (isDone) Color.LTGRAY else Color.WHITE
+            if (isDone) {
+                circleFillPaint.color = 0xFF34D399.toInt()
+                canvas.drawCircle(240f, y - 11f, 20f, circleFillPaint)
+                canvas.drawText("✓", 240f, y - 3f, symbolPaint)
+            } else {
+                circleStrokePaint.color = task.quadrant.colorHex.toInt()
+                canvas.drawCircle(240f, y - 11f, 18f, circleStrokePaint)
+                if (task.repeat != RepeatType.NONE) {
+                    val repeatSym = Paint(symbolPaint).apply { color = task.quadrant.colorHex.toInt(); textSize = 22f }
+                    canvas.drawText("↻", 240f, y - 4f, repeatSym)
+                }
+            }
+
+            textPaint.color = if (isDone) Color.argb(170, 148, 163, 184) else Color.WHITE
             textPaint.isStrikeThruText = isDone
-            val timePrefix = task.time?.let { "$it  " } ?: ""
-            canvas.drawText("$timePrefix${task.title.take(28)}", 170f, y, textPaint)
+            canvas.drawText(task.title.take(26), 282f, y, textPaint)
             y += 84f
         }
 

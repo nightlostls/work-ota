@@ -90,6 +90,18 @@ class WorkRepository(context: Context) {
         prefs.edit().putStringSet("done_${date}", ids).apply()
     }
 
+    fun isSyncCalendarEnabled(): Boolean = prefs.getBoolean("sync_calendar", true)
+    fun setSyncCalendarEnabled(v: Boolean) = prefs.edit().putBoolean("sync_calendar", v).apply()
+
+    fun isNotificationsEnabled(): Boolean = prefs.getBoolean("notif_enabled", true)
+    fun setNotificationsEnabled(v: Boolean) = prefs.edit().putBoolean("notif_enabled", v).apply()
+
+    fun getDefaultBeforeMin(): Int = prefs.getInt("default_before_min", 15)
+    fun setDefaultBeforeMin(v: Int) = prefs.edit().putInt("default_before_min", v).apply()
+
+    fun getDefaultUntimedTime(): String = prefs.getString("default_untimed_time", "09:00") ?: "09:00"
+    fun setDefaultUntimedTime(v: String) = prefs.edit().putString("default_untimed_time", v).apply()
+
     fun getSyncRoomCode(): String = prefs.getString("sync_room_code", "") ?: ""
 
     fun setSyncRoomCode(code: String) {
