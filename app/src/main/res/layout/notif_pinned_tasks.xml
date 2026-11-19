@@ -3,14 +3,15 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
-    android:padding="12dp">
+    android:paddingHorizontal="10dp"
+    android:paddingVertical="6dp">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:gravity="center_vertical"
         android:orientation="horizontal"
-        android:paddingBottom="6dp">
+        android:paddingBottom="4dp">
         <TextView
             android:id="@+id/notif_header"
             android:layout_width="0dp"
@@ -18,7 +19,7 @@
             android:layout_weight="1"
             android:text="Work · Việc hôm nay"
             android:textColor="#FFFFFF"
-            android:textSize="14sp"
+            android:textSize="13sp"
             android:textStyle="bold" />
         <TextView
             android:id="@+id/notif_progress"
@@ -30,28 +31,28 @@
             android:textStyle="bold" />
     </LinearLayout>
 
-    <LinearLayout android:id="@+id/row_0" android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical" android:orientation="horizontal" android:paddingVertical="4dp">
-        <TextView android:id="@+id/circle_0" android:layout_width="24dp" android:layout_height="24dp" android:gravity="center" android:textColor="#0F172A" android:textSize="12sp" android:textStyle="bold" />
+    <LinearLayout android:id="@+id/row_0" android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical" android:orientation="horizontal" android:paddingVertical="3dp">
+        <TextView android:id="@+id/circle_0" android:layout_width="18dp" android:layout_height="18dp" android:gravity="center" android:includeFontPadding="false" android:textColor="#0F172A" android:textSize="11sp" android:textStyle="bold" />
         <TextView android:id="@+id/title_0" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:layout_marginStart="10dp" android:ellipsize="end" android:maxLines="1" android:textColor="#F1F5F9" android:textSize="13sp" />
     </LinearLayout>
 
-    <LinearLayout android:id="@+id/row_1" android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical" android:orientation="horizontal" android:paddingVertical="4dp">
-        <TextView android:id="@+id/circle_1" android:layout_width="24dp" android:layout_height="24dp" android:gravity="center" android:textColor="#0F172A" android:textSize="12sp" android:textStyle="bold" />
+    <LinearLayout android:id="@+id/row_1" android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical" android:orientation="horizontal" android:paddingVertical="3dp">
+        <TextView android:id="@+id/circle_1" android:layout_width="18dp" android:layout_height="18dp" android:gravity="center" android:includeFontPadding="false" android:textColor="#0F172A" android:textSize="11sp" android:textStyle="bold" />
         <TextView android:id="@+id/title_1" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:layout_marginStart="10dp" android:ellipsize="end" android:maxLines="1" android:textColor="#F1F5F9" android:textSize="13sp" />
     </LinearLayout>
 
-    <LinearLayout android:id="@+id/row_2" android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical" android:orientation="horizontal" android:paddingVertical="4dp">
-        <TextView android:id="@+id/circle_2" android:layout_width="24dp" android:layout_height="24dp" android:gravity="center" android:textColor="#0F172A" android:textSize="12sp" android:textStyle="bold" />
+    <LinearLayout android:id="@+id/row_2" android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical" android:orientation="horizontal" android:paddingVertical="3dp">
+        <TextView android:id="@+id/circle_2" android:layout_width="18dp" android:layout_height="18dp" android:gravity="center" android:includeFontPadding="false" android:textColor="#0F172A" android:textSize="11sp" android:textStyle="bold" />
         <TextView android:id="@+id/title_2" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:layout_marginStart="10dp" android:ellipsize="end" android:maxLines="1" android:textColor="#F1F5F9" android:textSize="13sp" />
     </LinearLayout>
 
-    <LinearLayout android:id="@+id/row_3" android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical" android:orientation="horizontal" android:paddingVertical="4dp">
-        <TextView android:id="@+id/circle_3" android:layout_width="24dp" android:layout_height="24dp" android:gravity="center" android:textColor="#0F172A" android:textSize="12sp" android:textStyle="bold" />
+    <LinearLayout android:id="@+id/row_3" android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical" android:orientation="horizontal" android:paddingVertical="3dp">
+        <TextView android:id="@+id/circle_3" android:layout_width="18dp" android:layout_height="18dp" android:gravity="center" android:includeFontPadding="false" android:textColor="#0F172A" android:textSize="11sp" android:textStyle="bold" />
         <TextView android:id="@+id/title_3" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:layout_marginStart="10dp" android:ellipsize="end" android:maxLines="1" android:textColor="#F1F5F9" android:textSize="13sp" />
     </LinearLayout>
 
-    <LinearLayout android:id="@+id/row_4" android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical" android:orientation="horizontal" android:paddingVertical="4dp">
-        <TextView android:id="@+id/circle_4" android:layout_width="24dp" android:layout_height="24dp" android:gravity="center" android:textColor="#0F172A" android:textSize="12sp" android:textStyle="bold" />
+    <LinearLayout android:id="@+id/row_4" android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical" android:orientation="horizontal" android:paddingVertical="3dp">
+        <TextView android:id="@+id/circle_4" android:layout_width="18dp" android:layout_height="18dp" android:gravity="center" android:includeFontPadding="false" android:textColor="#0F172A" android:textSize="11sp" android:textStyle="bold" />
         <TextView android:id="@+id/title_4" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:layout_marginStart="10dp" android:ellipsize="end" android:maxLines="1" android:textColor="#F1F5F9" android:textSize="13sp" />
     </LinearLayout>
 </LinearLayout>

@@ -267,12 +267,12 @@ fun TasksTabView(
         if (viewMatrix) {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxSize()) {
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.weight(1f).fillMaxWidth()) {
-                    QuadrantCard(Quadrant.Q1, "🔥", tasks.filter { it.quadrant == Quadrant.Q1 }, doneIds, onToggleTask, onAddInQuad, Modifier.weight(1f).fillMaxHeight())
-                    QuadrantCard(Quadrant.Q2, "📅", tasks.filter { it.quadrant == Quadrant.Q2 }, doneIds, onToggleTask, onAddInQuad, Modifier.weight(1f).fillMaxHeight())
+                    QuadrantCard(Quadrant.Q1, "🔥", tasks.filter { it.quadrant == Quadrant.Q1 }, doneIds, onToggleTask, onAddInQuad, onDeleteTask, Modifier.weight(1f).fillMaxHeight())
+                    QuadrantCard(Quadrant.Q2, "📅", tasks.filter { it.quadrant == Quadrant.Q2 }, doneIds, onToggleTask, onAddInQuad, onDeleteTask, Modifier.weight(1f).fillMaxHeight())
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.weight(1f).fillMaxWidth()) {
-                    QuadrantCard(Quadrant.Q3, "⚡", tasks.filter { it.quadrant == Quadrant.Q3 }, doneIds, onToggleTask, onAddInQuad, Modifier.weight(1f).fillMaxHeight())
-                    QuadrantCard(Quadrant.Q4, "☰", tasks.filter { it.quadrant == Quadrant.Q4 }, doneIds, onToggleTask, onAddInQuad, Modifier.weight(1f).fillMaxHeight())
+                    QuadrantCard(Quadrant.Q3, "⚡", tasks.filter { it.quadrant == Quadrant.Q3 }, doneIds, onToggleTask, onAddInQuad, onDeleteTask, Modifier.weight(1f).fillMaxHeight())
+                    QuadrantCard(Quadrant.Q4, "☰", tasks.filter { it.quadrant == Quadrant.Q4 }, doneIds, onToggleTask, onAddInQuad, onDeleteTask, Modifier.weight(1f).fillMaxHeight())
                 }
             }
         } else {
@@ -293,6 +293,7 @@ fun QuadrantCard(
     doneIds: Set<String>,
     onToggleTask: (String) -> Unit,
     onAddInQuad: (Quadrant) -> Unit,
+    onDeleteTask: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val accent = Color(quad.colorHex)
@@ -301,9 +302,14 @@ fun QuadrantCard(
             .clip(RoundedCornerShape(18.dp))
             .background(Color(0xFF1A1F29))
             .border(1.dp, accent.copy(alpha = 0.35f), RoundedCornerShape(18.dp))
+            .clickable { onAddInQuad(quad) }
             .padding(10.dp)
     ) {
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+        Row(
+            modifier = Modifier.fillMaxWidth().clickable { onAddInQuad(quad) },
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
                 Text(icon, fontSize = 14.sp)
                 Spacer(Modifier.width(5.dp))
@@ -317,7 +323,7 @@ fun QuadrantCard(
             }
         }
         Spacer(Modifier.height(8.dp))
-        LazyColumn(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        LazyColumn(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.weight(1f)) {
             items(items, key = { it.id }) { t ->
                 val done = doneIds.contains(t.id)
                 Row(
@@ -325,16 +331,20 @@ fun QuadrantCard(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Box(
-                        modifier = Modifier.size(16.dp).clip(CircleShape)
+                        modifier = Modifier.size(18.dp).clip(CircleShape)
                             .border(2.dp, if (done) Color(0xFF34D399) else accent, CircleShape)
-                            .background(if (done) Color(0xFF34D399) else Color.Transparent)
-                    )
-                    Spacer(Modifier.width(8.dp))
+                            .background(if (done) Color(0xFF34D399) else Color.Transparent),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (done) Text("✓", color = Color(0xFF0F172A), fontSize = 11.sp, fontWeight = FontWeight.ExtraBold)
+                    }
+                    Spacer(Modifier.width(7.dp))
                     Column(Modifier.weight(1f)) {
                         Text(t.title, color = if (done) Color.Gray else Color.White, fontSize = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, textDecoration = if (done) TextDecoration.LineThrough else TextDecoration.None)
                         val rem = NoteReminderParser.computeReminderTime(t)
                         Text("${t.time ?: "Cả ngày"} · 🔔 ${rem ?: "--"}", fontSize = 10.sp, color = Color(0xFF94A3B8))
                     }
+                    Text("✕", color = Color(0xFF64748B), fontSize = 11.sp, modifier = Modifier.clickable { onDeleteTask(t.id) }.padding(start = 4.dp, top = 2.dp, bottom = 2.dp))
                 }
             }
         }
@@ -352,8 +362,11 @@ fun TaskRowCard(t: WorkTask, isDone: Boolean, onToggle: () -> Unit, onDelete: ()
         Box(
             modifier = Modifier.size(24.dp).clip(CircleShape)
                 .border(2.dp, if (isDone) Color(0xFF34D399) else accent, CircleShape)
-                .background(if (isDone) Color(0xFF34D399) else Color.Transparent)
-        )
+                .background(if (isDone) Color(0xFF34D399) else Color.Transparent),
+            contentAlignment = Alignment.Center
+        ) {
+            if (isDone) Text("✓", color = Color(0xFF0F172A), fontSize = 13.sp, fontWeight = FontWeight.ExtraBold)
+        }
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
             Text(t.title, color = if (isDone) Color.Gray else Color.White, fontWeight = FontWeight.SemiBold, textDecoration = if (isDone) TextDecoration.LineThrough else TextDecoration.None)
