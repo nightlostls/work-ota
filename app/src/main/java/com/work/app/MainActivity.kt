@@ -45,6 +45,7 @@ import com.work.app.update.OtaUpdater
 import com.work.app.wallpaper.LockScreenRenderer
 import com.work.app.worker.DailyResetWorker
 import java.io.File
+import java.util.concurrent.Executors
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -97,11 +98,15 @@ fun WorkAppScreen() {
         }
     }
 
+    val bgExecutor = remember { Executors.newSingleThreadExecutor() }
+
     fun refreshLocalOnly() {
         tasks = repo.getTasksForDate(selectedDate)
         doneIds = repo.getCompletedIds(selectedDate)
-        PinnedTaskNotification.showOrUpdate(ctx)
-        LockScreenRenderer.renderAndApplyLockScreen(ctx)
+        bgExecutor.execute {
+            PinnedTaskNotification.showOrUpdate(ctx)
+            LockScreenRenderer.renderAndApplyLockScreen(ctx)
+        }
     }
 
     fun refreshAll() {
@@ -202,11 +207,11 @@ fun WorkAppScreen() {
                     onSelectWallpaper = { path ->
                         repo.setActiveWallpaperPath(path)
                         activeWallPath = path
-                        LockScreenRenderer.renderAndApplyLockScreen(ctx)
+                        bgExecutor.execute { LockScreenRenderer.renderAndApplyLockScreen(ctx) }
                         statusBanner = "Đã đổi hình nền màn hình khóa"
                     },
                     onApplyNow = {
-                        LockScreenRenderer.renderAndApplyLockScreen(ctx)
+                        bgExecutor.execute { LockScreenRenderer.renderAndApplyLockScreen(ctx) }
                         statusBanner = "Đã cập nhật màn hình khóa!"
                     }
                 )
@@ -482,7 +487,7 @@ fun SettingsTabView(
     var beforeMin by remember { mutableStateOf(repo.getDefaultBeforeMin()) }
     var roomCode by remember { mutableStateOf(repo.getSyncRoomCode()) }
     var syncStatus by remember { mutableStateOf(if (roomCode.isBlank()) "Nhập mã phòng giống nhau trên 2 máy" else "Phòng: $roomCode") }
-    var otaStatus by remember { mutableStateOf("Phiên bản hiện tại: v${OtaUpdater.getCurrentVersion(ctx)}") }
+    val otaStatus = OtaUpdater.statusMessage.ifBlank { "Phiên bản hiện tại: v${OtaUpdater.getCurrentVersion(ctx)}" }
 
     Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("Cài đặt", fontSize = 22.sp, fontWeight = FontWeight.ExtraBold, color = Color.White)
@@ -564,8 +569,17 @@ fun SettingsTabView(
         Text("CẬP NHẬT ỨNG DỤNG (GITHUB OTA)", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color(0xFF94A3B8))
         Column(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(Color(0xFF1A1F29)).padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(otaStatus, fontSize = 12.sp, color = Color(0xFF94A3B8))
-            Button(onClick = { OtaUpdater.checkAndInstallUpdate(ctx) { msg -> otaStatus = msg } }, modifier = Modifier.fillMaxWidth()) {
-                Text("🔄 Kiểm tra & Cập nhật ngay")
+            if (OtaUpdater.readyApkFile != null) {
+                Button(onClick = { OtaUpdater.installDownloadedApk(ctx) }, modifier = Modifier.fillMaxWidth()) {
+                    Text("📦 Cài đặt bản đã tải ngay")
+                }
+            }
+            Button(
+                onClick = { OtaUpdater.checkAndInstallUpdate(ctx) },
+                enabled = !OtaUpdater.isBusy,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(if (OtaUpdater.isBusy) "⏳ Đang tải bản cập nhật..." else "🔄 Kiểm tra & Cập nhật ngay")
             }
         }
     }
