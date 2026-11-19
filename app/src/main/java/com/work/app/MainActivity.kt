@@ -390,7 +390,13 @@ fun CalendarTabView(
     onToggleTask: (String) -> Unit
 ) {
     val ctx = LocalContext.current
-    val events = remember(selectedDate) { DeviceCalendarSync.getEventsForDate(ctx, selectedDate) }
+    var events by remember { mutableStateOf<List<com.work.app.calendar.SyncedCalendarEvent>>(emptyList()) }
+    LaunchedEffect(selectedDate) {
+        Thread {
+            val loaded = DeviceCalendarSync.getEventsForDate(ctx, selectedDate)
+            events = loaded
+        }.start()
+    }
     val monday = selectedDate.minusDays(((selectedDate.dayOfWeek.value - 1).toLong()))
     val weekDates = (0..6).map { monday.plusDays(it.toLong()) }
     val labels = listOf("T2", "T3", "T4", "T5", "T6", "T7", "CN")
@@ -458,7 +464,12 @@ fun LockScreenTabView(
                 }
             }
             items(wallpapers, key = { it.id }) { w ->
-                val bmp = remember(w.filePath) { runCatching { BitmapFactory.decodeFile(w.filePath) }.getOrNull() }
+                val bmp = remember(w.filePath) {
+                    runCatching {
+                        val opts = BitmapFactory.Options().apply { inSampleSize = 4 }
+                        BitmapFactory.decodeFile(w.filePath, opts)
+                    }.getOrNull()
+                }
                 val isActive = w.filePath == activeWallPath
                 Box(
                     modifier = Modifier.aspectRatio(9f / 14f).clip(RoundedCornerShape(14.dp))

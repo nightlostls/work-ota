@@ -7,6 +7,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.graphics.Color
+import android.net.Uri
 import android.view.View
 import android.widget.RemoteViews
 import androidx.core.app.NotificationCompat
@@ -14,6 +15,7 @@ import com.work.app.MainActivity
 import com.work.app.R
 import com.work.app.data.Quadrant
 import com.work.app.data.WorkRepository
+import com.work.app.sync.FirebaseSync
 import com.work.app.wallpaper.LockScreenRenderer
 
 object PinnedTaskNotification {
@@ -65,10 +67,15 @@ object PinnedTaskNotification {
                 rv.setTextViewText(titleIds[i], "$timeStr${t.title}")
                 rv.setTextColor(titleIds[i], if (isDone) Color.parseColor("#64748B") else Color.parseColor("#F1F5F9"))
 
-                val toggleIntent = Intent(context, TaskDoneReceiver::class.java).putExtra("task_id", t.id)
+                // Unique Action + Data URI prevents OEM PendingIntent collision across rows
+                val toggleIntent = Intent(context, TaskDoneReceiver::class.java).apply {
+                    action = "com.work.app.TOGGLE_TASK_${t.id}"
+                    data = Uri.parse("work://task/${t.id}")
+                    putExtra("task_id", t.id)
+                }
                 val pi = PendingIntent.getBroadcast(
                     context,
-                    t.id.hashCode(),
+                    100 + i,
                     toggleIntent,
                     PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
                 )
@@ -82,6 +89,7 @@ object PinnedTaskNotification {
         val notif = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_menu_agenda)
             .setOngoing(true)
+            .setOnlyAlertOnce(true)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setCustomContentView(rv)
             .setCustomBigContentView(rv)
@@ -95,9 +103,17 @@ object PinnedTaskNotification {
 
 class TaskDoneReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
-        val taskId = intent.getStringExtra("task_id") ?: return
-        WorkRepository(context).toggleTaskDone(taskId)
-        PinnedTaskNotification.showOrUpdate(context)
-        LockScreenRenderer.renderAndApplyLockScreen(context)
+        val taskId = intent.getStringExtra("task_id") ?: intent.data?.lastPathSegment ?: return
+        val appCtx = context.applicationContext
+        WorkRepository(appCtx).toggleTaskDone(taskId)
+        // Update notification immediately (< 5ms)
+        PinnedTaskNotification.showOrUpdate(appCtx)
+        // Render lockscreen & sync in background so notification never lags
+        Thread {
+            LockScreenRenderer.renderAndApplyLockScreen(appCtx)
+            if (WorkRepository(appCtx).getSyncRoomCode().isNotBlank()) {
+                FirebaseSync.pushToCloud(appCtx)
+            }
+        }.start()
     }
 }
