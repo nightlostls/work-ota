@@ -79,6 +79,7 @@ fun WorkAppScreen() {
     var doneIds by remember { mutableStateOf(repo.getCompletedIds(selectedDate)) }
     var viewMatrix by remember { mutableStateOf(true) }
     var showAddDialog by remember { mutableStateOf(false) }
+    var editingTask by remember { mutableStateOf<WorkTask?>(null) }
     var presetQuad by remember { mutableStateOf(Quadrant.Q1) }
     var wallpapers by remember { mutableStateOf(repo.getWallpapers()) }
     var activeWallPath by remember { mutableStateOf(repo.getActiveWallpaperPath()) }
@@ -130,6 +131,7 @@ fun WorkAppScreen() {
             if (tab == 0 || tab == 1) {
                 FloatingActionButton(
                     onClick = {
+                        editingTask = null
                         presetQuad = Quadrant.Q1
                         showAddDialog = true
                     },
@@ -176,7 +178,12 @@ fun WorkAppScreen() {
                         repo.toggleTaskDone(id, selectedDate)
                         refreshAll()
                     },
+                    onEditTask = { t ->
+                        editingTask = t
+                        showAddDialog = true
+                    },
                     onAddInQuad = { q ->
+                        editingTask = null
                         presetQuad = q
                         showAddDialog = true
                     },
@@ -198,6 +205,10 @@ fun WorkAppScreen() {
                     onToggleTask = { id ->
                         repo.toggleTaskDone(id, selectedDate)
                         refreshAll()
+                    },
+                    onEditTask = { t ->
+                        editingTask = t
+                        showAddDialog = true
                     }
                 )
                 2 -> LockScreenTabView(
@@ -225,15 +236,32 @@ fun WorkAppScreen() {
         }
 
         if (showAddDialog) {
-            AddTaskDialog(
+            TaskFormDialog(
+                existingTask = editingTask,
                 initialQuad = presetQuad,
                 initialDate = selectedDate,
-                onDismiss = { showAddDialog = false },
-                onSave = { newTask ->
+                onDismiss = {
+                    showAddDialog = false
+                    editingTask = null
+                },
+                onSave = { savedTask ->
                     val list = repo.getTasks().toMutableList()
-                    list.add(0, newTask)
+                    val idx = list.indexOfFirst { it.id == savedTask.id }
+                    if (idx >= 0) {
+                        list[idx] = savedTask
+                    } else {
+                        list.add(0, savedTask)
+                    }
                     repo.saveTasks(list)
                     showAddDialog = false
+                    editingTask = null
+                    refreshAll()
+                },
+                onDelete = { delId ->
+                    val updated = repo.getTasks().filterNot { it.id == delId }
+                    repo.saveTasks(updated)
+                    showAddDialog = false
+                    editingTask = null
                     refreshAll()
                 }
             )
@@ -248,6 +276,7 @@ fun TasksTabView(
     viewMatrix: Boolean,
     onToggleView: (Boolean) -> Unit,
     onToggleTask: (String) -> Unit,
+    onEditTask: (WorkTask) -> Unit,
     onAddInQuad: (Quadrant) -> Unit,
     onDeleteTask: (String) -> Unit
 ) {
@@ -272,18 +301,18 @@ fun TasksTabView(
         if (viewMatrix) {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxSize()) {
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.weight(1f).fillMaxWidth()) {
-                    QuadrantCard(Quadrant.Q1, "🔥", tasks.filter { it.quadrant == Quadrant.Q1 }, doneIds, onToggleTask, onAddInQuad, onDeleteTask, Modifier.weight(1f).fillMaxHeight())
-                    QuadrantCard(Quadrant.Q2, "📅", tasks.filter { it.quadrant == Quadrant.Q2 }, doneIds, onToggleTask, onAddInQuad, onDeleteTask, Modifier.weight(1f).fillMaxHeight())
+                    QuadrantCard(Quadrant.Q1, "🔥", tasks.filter { it.quadrant == Quadrant.Q1 }, doneIds, onToggleTask, onEditTask, onAddInQuad, onDeleteTask, Modifier.weight(1f).fillMaxHeight())
+                    QuadrantCard(Quadrant.Q2, "📅", tasks.filter { it.quadrant == Quadrant.Q2 }, doneIds, onToggleTask, onEditTask, onAddInQuad, onDeleteTask, Modifier.weight(1f).fillMaxHeight())
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.weight(1f).fillMaxWidth()) {
-                    QuadrantCard(Quadrant.Q3, "⚡", tasks.filter { it.quadrant == Quadrant.Q3 }, doneIds, onToggleTask, onAddInQuad, onDeleteTask, Modifier.weight(1f).fillMaxHeight())
-                    QuadrantCard(Quadrant.Q4, "☰", tasks.filter { it.quadrant == Quadrant.Q4 }, doneIds, onToggleTask, onAddInQuad, onDeleteTask, Modifier.weight(1f).fillMaxHeight())
+                    QuadrantCard(Quadrant.Q3, "⚡", tasks.filter { it.quadrant == Quadrant.Q3 }, doneIds, onToggleTask, onEditTask, onAddInQuad, onDeleteTask, Modifier.weight(1f).fillMaxHeight())
+                    QuadrantCard(Quadrant.Q4, "☰", tasks.filter { it.quadrant == Quadrant.Q4 }, doneIds, onToggleTask, onEditTask, onAddInQuad, onDeleteTask, Modifier.weight(1f).fillMaxHeight())
                 }
             }
         } else {
             LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 items(tasks, key = { it.id }) { t ->
-                    TaskRowCard(t, doneIds.contains(t.id), { onToggleTask(t.id) }, { onDeleteTask(t.id) })
+                    TaskRowCard(t, doneIds.contains(t.id), { onToggleTask(t.id) }, { onEditTask(t) }, { onDeleteTask(t.id) })
                 }
             }
         }
@@ -297,6 +326,7 @@ fun QuadrantCard(
     items: List<WorkTask>,
     doneIds: Set<String>,
     onToggleTask: (String) -> Unit,
+    onEditTask: (WorkTask) -> Unit,
     onAddInQuad: (Quadrant) -> Unit,
     onDeleteTask: (String) -> Unit,
     modifier: Modifier = Modifier
@@ -332,18 +362,23 @@ fun QuadrantCard(
             items(items, key = { it.id }) { t ->
                 val done = doneIds.contains(t.id)
                 Row(
-                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(Color(0xFF232936)).clickable { onToggleTask(t.id) }.padding(8.dp),
+                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(Color(0xFF232936)).clickable { onEditTask(t) }.padding(6.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Box(
-                        modifier = Modifier.size(18.dp).clip(CircleShape)
-                            .border(2.dp, if (done) Color(0xFF34D399) else accent, CircleShape)
-                            .background(if (done) Color(0xFF34D399) else Color.Transparent),
+                        modifier = Modifier.size(30.dp).clip(CircleShape).clickable { onToggleTask(t.id) },
                         contentAlignment = Alignment.Center
                     ) {
-                        if (done) Text("✓", color = Color(0xFF0F172A), fontSize = 11.sp, fontWeight = FontWeight.ExtraBold)
+                        Box(
+                            modifier = Modifier.size(18.dp).clip(CircleShape)
+                                .border(2.dp, if (done) Color(0xFF34D399) else accent, CircleShape)
+                                .background(if (done) Color(0xFF34D399) else Color.Transparent),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (done) Text("✓", color = Color(0xFF0F172A), fontSize = 11.sp, fontWeight = FontWeight.ExtraBold)
+                        }
                     }
-                    Spacer(Modifier.width(7.dp))
+                    Spacer(Modifier.width(3.dp))
                     Column(Modifier.weight(1f)) {
                         Text(t.title, color = if (done) Color.Gray else Color.White, fontSize = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, textDecoration = if (done) TextDecoration.LineThrough else TextDecoration.None)
                         val rem = NoteReminderParser.computeReminderTime(t)
@@ -357,22 +392,27 @@ fun QuadrantCard(
 }
 
 @Composable
-fun TaskRowCard(t: WorkTask, isDone: Boolean, onToggle: () -> Unit, onDelete: () -> Unit) {
+fun TaskRowCard(t: WorkTask, isDone: Boolean, onToggle: () -> Unit, onEdit: () -> Unit, onDelete: () -> Unit) {
     val accent = Color(t.quadrant.colorHex)
     val rem = NoteReminderParser.computeReminderTime(t)
     Row(
-        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Color(0xFF1A1F29)).clickable { onToggle() }.padding(14.dp),
+        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Color(0xFF1A1F29)).clickable { onEdit() }.padding(10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(
-            modifier = Modifier.size(24.dp).clip(CircleShape)
-                .border(2.dp, if (isDone) Color(0xFF34D399) else accent, CircleShape)
-                .background(if (isDone) Color(0xFF34D399) else Color.Transparent),
+            modifier = Modifier.size(36.dp).clip(CircleShape).clickable { onToggle() },
             contentAlignment = Alignment.Center
         ) {
-            if (isDone) Text("✓", color = Color(0xFF0F172A), fontSize = 13.sp, fontWeight = FontWeight.ExtraBold)
+            Box(
+                modifier = Modifier.size(22.dp).clip(CircleShape)
+                    .border(2.dp, if (isDone) Color(0xFF34D399) else accent, CircleShape)
+                    .background(if (isDone) Color(0xFF34D399) else Color.Transparent),
+                contentAlignment = Alignment.Center
+            ) {
+                if (isDone) Text("✓", color = Color(0xFF0F172A), fontSize = 12.sp, fontWeight = FontWeight.ExtraBold)
+            }
         }
-        Spacer(Modifier.width(12.dp))
+        Spacer(Modifier.width(8.dp))
         Column(Modifier.weight(1f)) {
             Text(t.title, color = if (isDone) Color.Gray else Color.White, fontWeight = FontWeight.SemiBold, textDecoration = if (isDone) TextDecoration.LineThrough else TextDecoration.None)
             Text("${t.time ?: "Cả ngày"} · ${t.repeat.name} · 🔔 ${rem ?: "--"}", fontSize = 12.sp, color = Color(0xFF94A3B8))
@@ -387,7 +427,8 @@ fun CalendarTabView(
     onSelectDate: (LocalDate) -> Unit,
     tasks: List<WorkTask>,
     doneIds: Set<String>,
-    onToggleTask: (String) -> Unit
+    onToggleTask: (String) -> Unit,
+    onEditTask: (WorkTask) -> Unit
 ) {
     val ctx = LocalContext.current
     var events by remember { mutableStateOf<List<com.work.app.calendar.SyncedCalendarEvent>>(emptyList()) }
@@ -430,7 +471,7 @@ fun CalendarTabView(
                 }
             }
             items(tasks, key = { it.id }) { t ->
-                TaskRowCard(t, doneIds.contains(t.id), { onToggleTask(t.id) }, {})
+                TaskRowCard(t, doneIds.contains(t.id), { onToggleTask(t.id) }, { onEditTask(t) }, {})
             }
         }
     }
@@ -597,31 +638,60 @@ fun SettingsTabView(
 }
 
 @Composable
-fun AddTaskDialog(
+fun TaskFormDialog(
+    existingTask: WorkTask?,
     initialQuad: Quadrant,
     initialDate: LocalDate,
     onDismiss: () -> Unit,
-    onSave: (WorkTask) -> Unit
+    onSave: (WorkTask) -> Unit,
+    onDelete: (String) -> Unit
 ) {
-    var title by remember { mutableStateOf("") }
-    var note by remember { mutableStateOf("") }
-    var time by remember { mutableStateOf("20:59") }
-    var repeat by remember { mutableStateOf(RepeatType.DAILY) }
-    var quad by remember { mutableStateOf(initialQuad) }
+    var title by remember { mutableStateOf(existingTask?.title ?: "") }
+    var note by remember { mutableStateOf(existingTask?.note ?: "") }
+    var dateStr by remember { mutableStateOf(existingTask?.startDate ?: initialDate.toString()) }
+    var time by remember { mutableStateOf(existingTask?.time ?: "20:59") }
+    var repeat by remember { mutableStateOf(existingTask?.repeat ?: RepeatType.DAILY) }
+    var customDays by remember { mutableStateOf(existingTask?.customDays ?: listOf(1, 2, 3, 4, 5)) }
+    var quad by remember { mutableStateOf(existingTask?.quadrant ?: initialQuad) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Tạo công việc mới") },
+        title = { Text(if (existingTask == null) "Tạo công việc mới" else "Chỉnh sửa công việc") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.verticalScroll(rememberScrollState())) {
                 OutlinedTextField(value = title, onValueChange = { title = it }, label = { Text("Tiêu đề") }, singleLine = true)
                 OutlinedTextField(value = note, onValueChange = { note = it }, label = { Text("Ghi chú (vd: nhắc trước 30 phút)") })
+                OutlinedTextField(value = dateStr, onValueChange = { dateStr = it }, label = { Text("Ngày (YYYY-MM-DD)") }, singleLine = true)
                 OutlinedTextField(value = time, onValueChange = { time = it }, label = { Text("Giờ (để trống nếu cả ngày)") }, singleLine = true)
 
                 Text("Lặp lại (Miễn phí)", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    listOf(RepeatType.DAILY to "Hàng ngày", RepeatType.WEEKDAYS to "T2–T6", RepeatType.NONE to "1 lần").forEach { (r, lbl) ->
-                        FilterChip(selected = repeat == r, onClick = { repeat = r }, label = { Text(lbl, fontSize = 11.sp) })
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    listOf(RepeatType.NONE to "Chỉ 1 ngày", RepeatType.DAILY to "Hàng ngày", RepeatType.WEEKDAYS to "T2–T6").forEach { (r, lbl) ->
+                        FilterChip(selected = repeat == r, onClick = { repeat = r }, label = { Text(lbl, fontSize = 10.sp) })
+                    }
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    listOf(RepeatType.WEEKENDS to "Cuối tuần", RepeatType.CUSTOM to "Chọn thứ").forEach { (r, lbl) ->
+                        FilterChip(selected = repeat == r, onClick = { repeat = r }, label = { Text(lbl, fontSize = 10.sp) })
+                    }
+                }
+
+                if (repeat == RepeatType.CUSTOM) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        listOf(1 to "T2", 2 to "T3", 3 to "T4", 4 to "T5", 5 to "T6", 6 to "T7", 7 to "CN").forEach { (d, lbl) ->
+                            val sel = customDays.contains(d)
+                            Box(
+                                modifier = Modifier.weight(1f).clip(RoundedCornerShape(8.dp))
+                                    .background(if (sel) Color(0xFFF59E0B) else Color(0xFF1E293B))
+                                    .clickable {
+                                        customDays = if (sel) customDays - d else customDays + d
+                                    }
+                                    .padding(vertical = 6.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(lbl, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = if (sel) Color.Black else Color.White)
+                            }
+                        }
                     }
                 }
 
@@ -634,22 +704,31 @@ fun AddTaskDialog(
             }
         },
         confirmButton = {
-            Button(onClick = {
-                if (title.isNotBlank()) {
-                    onSave(
-                        WorkTask(
-                            id = "t_${System.currentTimeMillis()}",
-                            title = title.trim(),
-                            note = note.trim(),
-                            startDate = initialDate.toString(),
-                            time = time.trim().ifBlank { null },
-                            repeat = repeat,
-                            quadrant = quad,
-                            highPriority = quad == Quadrant.Q1
-                        )
-                    )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (existingTask != null) {
+                    TextButton(onClick = { onDelete(existingTask.id) }) {
+                        Text("Xóa", color = Color(0xFFFB7185))
+                    }
                 }
-            }) { Text("Lưu") }
+                Button(onClick = {
+                    if (title.isNotBlank()) {
+                        val validDate = runCatching { LocalDate.parse(dateStr.trim()).toString() }.getOrDefault(initialDate.toString())
+                        onSave(
+                            WorkTask(
+                                id = existingTask?.id ?: "t_${System.currentTimeMillis()}",
+                                title = title.trim(),
+                                note = note.trim(),
+                                startDate = validDate,
+                                time = time.trim().ifBlank { null },
+                                repeat = repeat,
+                                customDays = customDays,
+                                quadrant = quad,
+                                highPriority = quad == Quadrant.Q1
+                            )
+                        )
+                    }
+                }) { Text("Lưu") }
+            }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Hủy") } }
     )
