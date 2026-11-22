@@ -30,6 +30,16 @@
             android:name=".notification.TaskDoneReceiver"
             android:exported="false" />
 
+        <receiver
+            android:name=".worker.MidnightUpdateReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.work.app.MIDNIGHT_UPDATE" />
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.DATE_CHANGED" />
+            </intent-filter>
+        </receiver>
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
