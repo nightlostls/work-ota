@@ -8,6 +8,9 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.Color
 import android.net.Uri
+import android.text.SpannableString
+import android.text.Spanned
+import android.text.style.StrikethroughSpan
 import android.view.View
 import android.widget.RemoteViews
 import androidx.core.app.NotificationCompat
@@ -28,8 +31,10 @@ object PinnedTaskNotification {
         nm.createNotificationChannel(channel)
 
         val repo = WorkRepository(context)
-        val tasks = repo.getTasksForDate()
+        val rawTasks = repo.getTasksForDate()
         val doneIds = repo.getCompletedIds()
+        // Pending tasks first, completed tasks below
+        val tasks = rawTasks.sortedBy { doneIds.contains(it.id) }
 
         val openIntent = PendingIntent.getActivity(
             context, 0, Intent(context, MainActivity::class.java),
@@ -38,13 +43,22 @@ object PinnedTaskNotification {
 
         val rv = RemoteViews(context.packageName, R.layout.notif_pinned_tasks)
         rv.setTextViewText(R.id.notif_header, "Work · Việc hôm nay")
-        rv.setTextViewText(R.id.notif_progress, "${doneIds.size}/${tasks.size} xong")
+        rv.setTextViewText(R.id.notif_progress, "${doneIds.size}/${rawTasks.size} xong")
 
-        val rowIds = intArrayOf(R.id.row_0, R.id.row_1, R.id.row_2, R.id.row_3, R.id.row_4)
-        val circleIds = intArrayOf(R.id.circle_0, R.id.circle_1, R.id.circle_2, R.id.circle_3, R.id.circle_4)
-        val titleIds = intArrayOf(R.id.title_0, R.id.title_1, R.id.title_2, R.id.title_3, R.id.title_4)
+        val rowIds = intArrayOf(
+            R.id.row_0, R.id.row_1, R.id.row_2, R.id.row_3, R.id.row_4,
+            R.id.row_5, R.id.row_6, R.id.row_7, R.id.row_8, R.id.row_9
+        )
+        val circleIds = intArrayOf(
+            R.id.circle_0, R.id.circle_1, R.id.circle_2, R.id.circle_3, R.id.circle_4,
+            R.id.circle_5, R.id.circle_6, R.id.circle_7, R.id.circle_8, R.id.circle_9
+        )
+        val titleIds = intArrayOf(
+            R.id.title_0, R.id.title_1, R.id.title_2, R.id.title_3, R.id.title_4,
+            R.id.title_5, R.id.title_6, R.id.title_7, R.id.title_8, R.id.title_9
+        )
 
-        for (i in 0 until 5) {
+        for (i in 0 until 10) {
             if (i < tasks.size) {
                 val t = tasks[i]
                 val isDone = doneIds.contains(t.id)
@@ -64,10 +78,17 @@ object PinnedTaskNotification {
                 rv.setTextViewText(circleIds[i], if (isDone) "✓" else "")
 
                 val timeStr = t.time?.let { "$it · " } ?: ""
-                rv.setTextViewText(titleIds[i], "$timeStr${t.title}")
-                rv.setTextColor(titleIds[i], if (isDone) Color.parseColor("#64748B") else Color.parseColor("#F1F5F9"))
+                val displayText = "$timeStr${t.title}"
+                if (isDone) {
+                    val span = SpannableString(displayText)
+                    span.setSpan(StrikethroughSpan(), 0, displayText.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+                    rv.setTextViewText(titleIds[i], span)
+                    rv.setTextColor(titleIds[i], Color.parseColor("#CBD5E1"))
+                } else {
+                    rv.setTextViewText(titleIds[i], displayText)
+                    rv.setTextColor(titleIds[i], Color.parseColor("#FFFFFF"))
+                }
 
-                // Unique Action + Data URI prevents OEM PendingIntent collision across rows
                 val toggleIntent = Intent(context, TaskDoneReceiver::class.java).apply {
                     action = "com.work.app.TOGGLE_TASK_${t.id}"
                     data = Uri.parse("work://task/${t.id}")
@@ -106,9 +127,7 @@ class TaskDoneReceiver : BroadcastReceiver() {
         val taskId = intent.getStringExtra("task_id") ?: intent.data?.lastPathSegment ?: return
         val appCtx = context.applicationContext
         WorkRepository(appCtx).toggleTaskDone(taskId)
-        // Update notification immediately (< 5ms)
         PinnedTaskNotification.showOrUpdate(appCtx)
-        // Render lockscreen & sync in background so notification never lags
         Thread {
             LockScreenRenderer.renderAndApplyLockScreen(appCtx)
             if (WorkRepository(appCtx).getSyncRoomCode().isNotBlank()) {

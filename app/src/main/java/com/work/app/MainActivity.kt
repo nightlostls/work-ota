@@ -375,12 +375,12 @@ fun QuadrantCard(
                 Text("+", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
             }
         }
-        Spacer(Modifier.height(8.dp))
-        LazyColumn(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.weight(1f)) {
+        Spacer(Modifier.height(6.dp))
+        LazyColumn(verticalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.weight(1f)) {
             items(items, key = { it.id }) { t ->
                 val done = doneIds.contains(t.id)
                 Row(
-                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(Color(0xFF232936)).clickable { onEditTask(t) }.padding(6.dp),
+                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(Color(0xFF232936)).clickable { onEditTask(t) }.padding(horizontal = 6.dp, vertical = 4.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Box(
